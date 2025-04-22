@@ -1,0 +1,111 @@
+local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local LocalPlayer = Players.LocalPlayer
+local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+local HumanoidRootPart = Character:WaitForChild("HumanoidRootPart")
+local SpinSpeed = 19
+local SpinBotActive = false
+
+-- === SPINBOT ===
+local function ToggleSpinbot()
+    SpinBotActive = not SpinBotActive
+
+    if SpinBotActive then
+        local spin = Instance.new("BodyAngularVelocity")
+        spin.MaxTorque = Vector3.new(0, math.huge, 0)
+        spin.AngularVelocity = Vector3.new(0, SpinSpeed, 0)
+        spin.Parent = HumanoidRootPart
+    else
+        local spin = HumanoidRootPart:FindFirstChild("BodyAngularVelocity")
+        if spin then spin:Destroy() end
+    end
+end
+
+UserInputService.InputBegan:Connect(function(input, gameProcessedEvent)
+    if gameProcessedEvent then return end
+    if input.UserInputType == Enum.UserInputType.Gamepad1 and input.KeyCode == Enum.KeyCode.ButtonR1 then
+        ToggleSpinbot()
+    end
+end)
+
+Players.LocalPlayer.CharacterAdded:Connect(function(newCharacter)
+    Character = newCharacter
+    HumanoidRootPart = newCharacter:WaitForChild("HumanoidRootPart")
+end)
+
+-- === WALKSPEED ===
+local function applySpeed()
+    local character = LocalPlayer.Character
+    if not character then return end
+    local humanoid = character:FindFirstChildOfClass("Humanoid")
+    if humanoid then
+        humanoid.WalkSpeed = 20
+    end
+end
+
+LocalPlayer.CharacterAdded:Connect(function(char)
+    char:WaitForChild("Humanoid")
+    applySpeed()
+end)
+
+RunService.Stepped:Connect(function()
+    applySpeed()
+end)
+
+if LocalPlayer.Character then
+    applySpeed()
+end
+
+-- === INFINITE STAMINA ===
+task.spawn(function()
+    local success, staminaValue = pcall(function()
+        return LocalPlayer:WaitForChild("Values"):WaitForChild("Stamina")
+    end)
+
+    if success and staminaValue then
+        while true do
+            staminaValue.Value = 1
+            task.wait(0.1)
+        end
+    end
+end)
+
+-- === AUTO GREEN ===
+task.spawn(function()
+    local success, err = pcall(function()
+        local ShootRemote = ReplicatedStorage:WaitForChild("Events"):WaitForChild("Shoot")
+        local ShootButton = LocalPlayer.PlayerGui.Mobile.Offense:WaitForChild("Shoot")
+        local Meter2Meter = LocalPlayer.Character:WaitForChild("Meter2"):WaitForChild("Meter")
+
+        local AutoGreenEnabled = true
+        local shotTiming = 0.2
+
+        local function AutoGreenShot()
+            if AutoGreenEnabled then
+                ShootRemote:FireServer(true, 100)
+                task.wait(shotTiming)
+                ShootRemote:FireServer(false, -0.99, true)
+            end
+        end
+
+        ShootButton.MouseButton1Down:Connect(function()
+            if AutoGreenEnabled then
+                AutoGreenShot()
+            end
+        end)
+
+        UserInputService.InputBegan:Connect(function(input, gameProcessed)
+            if gameProcessed then return end
+            if input.UserInputType == Enum.UserInputType.Gamepad1 and input.KeyCode == Enum.KeyCode.ButtonX and AutoGreenEnabled then
+                AutoGreenShot()
+            end
+        end)
+    end)
+
+    if not success then
+        warn("Auto Green error:", err)
+    end
+end)
