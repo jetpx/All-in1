@@ -1,29 +1,65 @@
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local LocalPlayer = Players.LocalPlayer
-local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+local Character = LocalPlayer.Character or Players.LocalPlayer.CharacterAdded:Wait()
 local HumanoidRootPart = Character:WaitForChild("HumanoidRootPart")
+
 local SpinSpeed = 23
 local SpinBotActive = false
+local spin
+local heartbeatConnection
 
 -- === SPINBOT ===
 local function ToggleSpinbot()
     SpinBotActive = not SpinBotActive
 
     if SpinBotActive then
-        local spin = Instance.new("BodyAngularVelocity")
+        spin = Instance.new("BodyAngularVelocity")
         spin.MaxTorque = Vector3.new(0, math.huge, 0)
         spin.AngularVelocity = Vector3.new(0, SpinSpeed, 0)
         spin.Parent = HumanoidRootPart
+
+        heartbeatConnection = RunService.Heartbeat:Connect(function()
+            if not (SpinBotActive and spin and HumanoidRootPart and Character) then return end
+
+            local humanoid = Character:FindFirstChildOfClass("Humanoid")
+            if humanoid then
+                local moveDirection = humanoid.MoveDirection
+
+                if moveDirection.Magnitude > 0.1 then
+                    -- Only check horizontal (X-axis) movement to make smoother
+                    if moveDirection.X > 0.2 then
+                        -- Moving right
+                        spin.AngularVelocity = Vector3.new(0, math.abs(SpinSpeed), 0)
+                    elseif moveDirection.X < -0.2 then
+                        -- Moving left
+                        spin.AngularVelocity = Vector3.new(0, -math.abs(SpinSpeed), 0)
+                    else
+                        -- Moving mostly forward/backward, keep normal spin
+                        spin.AngularVelocity = Vector3.new(0, SpinSpeed, 0)
+                    end
+                else
+                    -- Standing still, normal spin
+                    spin.AngularVelocity = Vector3.new(0, SpinSpeed, 0)
+                end
+            end
+        end)
+
     else
-        local spin = HumanoidRootPart:FindFirstChild("BodyAngularVelocity")
-        if spin then spin:Destroy() end
+        if spin then
+            spin:Destroy()
+            spin = nil
+        end
+        if heartbeatConnection then
+            heartbeatConnection:Disconnect()
+            heartbeatConnection = nil
+        end
     end
 end
 
+-- === CONTROLLER RB TO TOGGLE ===
 UserInputService.InputBegan:Connect(function(input, gameProcessedEvent)
     if gameProcessedEvent then return end
     if input.UserInputType == Enum.UserInputType.Gamepad1 and input.KeyCode == Enum.KeyCode.ButtonR1 then
@@ -31,10 +67,12 @@ UserInputService.InputBegan:Connect(function(input, gameProcessedEvent)
     end
 end)
 
+-- === Handle respawns ===
 Players.LocalPlayer.CharacterAdded:Connect(function(newCharacter)
     Character = newCharacter
     HumanoidRootPart = newCharacter:WaitForChild("HumanoidRootPart")
 end)
+
 
 -- === WALKSPEED ===
 local function applySpeed()
